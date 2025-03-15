@@ -1,0 +1,4 @@
+To do
+- split out index.html into a proper react set up
+- fix the clicks: right now when you click on the frequency domain diagram the click is too low
+- fix frequency numbers/labels on Time Domain chart: right now 1Hz is showing as 1/6 Hz
