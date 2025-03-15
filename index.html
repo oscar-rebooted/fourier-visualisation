@@ -33,6 +33,22 @@
       font-size: 14px;
       color: #666;
     }
+    #contextMenu {
+      display: none;
+      position: absolute;
+      background-color: white;
+      border: 1px solid #ccc;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+      padding: 5px 0;
+      z-index: 1000;
+    }
+    #contextMenu div {
+      padding: 5px 15px;
+      cursor: pointer;
+    }
+    #contextMenu div:hover {
+      background-color: #f2f2f2;
+    }
   </style>
 </head>
 <body>
@@ -48,7 +64,11 @@
     <div class="chart-container">
       <canvas id="freqChart"></canvas>
     </div>
-    <p class="instructions">Click anywhere to set amplitude at that frequency</p>
+    <p class="instructions">Click to set amplitude at that frequency. Right-click to delete a frequency component.</p>
+  </div>
+  
+  <div id="contextMenu">
+    <div id="deleteFreq">Delete frequency component</div>
   </div>
   
   <script>
@@ -90,14 +110,7 @@
             display: false
           },
           tooltip: {
-            callbacks: {
-              title: function(context) {
-                return 'Frequency: ' + context[0].label + ' Hz';
-              },
-              label: function(context) {
-                return 'Amplitude: ' + context.raw.toFixed(2);
-              }
-            }
+            enabled: false
           }
         },
         scales: {
@@ -115,6 +128,9 @@
               text: 'Frequency (Hz)'
             }
           }
+        },
+        animation: {
+          duration: 0 // Disable all animations
         }
       }
     });
@@ -154,24 +170,30 @@
               display: true,
               text: 'Time'
             },
+            min: 0,
+            max: 4 * Math.PI,
             ticks: {
               callback: function(value) {
                 return value.toFixed(1);
               }
             }
           }
+        },
+        animation: {
+          duration: 0 // Disable all animations
         }
       }
     });
     
     // Generate time domain data
     function updateTimeData() {
-      var points = 200;
+      var points = 400;
       var timeData = [];
       var labels = [];
       
+      // Generate points across the full range
       for (var i = 0; i < points; i++) {
-        var t = (i / points) * 4 * Math.PI;
+        var t = (i / (points - 1)) * 4 * Math.PI; // Full range from 0 to 4π
         var signal = 0;
         
         // Sum all frequency components
@@ -191,7 +213,46 @@
     // Initial render
     updateTimeData();
     
-    // Handle clicks on the frequency chart to set amplitude directly
+    // Context menu setup
+    var contextMenu = document.getElementById('contextMenu');
+    var deleteFreqOption = document.getElementById('deleteFreq');
+    var rightClickedFreqIndex = -1;
+    
+    // Handle right click on frequency chart
+    freqCtx.canvas.addEventListener('contextmenu', function(e) {
+      e.preventDefault();
+      
+      var element = freqChart.getElementsAtEventForMode(e, 'nearest', { intersect: true }, false);
+      if (element.length > 0) {
+        rightClickedFreqIndex = element[0].index;
+        
+        // Only show context menu if there's an amplitude to delete
+        if (amplitudes[rightClickedFreqIndex] > 0) {
+          // Position and show context menu
+          contextMenu.style.left = e.pageX + 'px';
+          contextMenu.style.top = e.pageY + 'px';
+          contextMenu.style.display = 'block';
+        }
+      }
+    });
+    
+    // Delete frequency component
+    deleteFreqOption.addEventListener('click', function() {
+      if (rightClickedFreqIndex !== -1) {
+        amplitudes[rightClickedFreqIndex] = 0;
+        freqChart.data.datasets[0].data = amplitudes;
+        freqChart.update();
+        updateTimeData();
+        contextMenu.style.display = 'none';
+      }
+    });
+    
+    // Hide context menu when clicking elsewhere
+    document.addEventListener('click', function() {
+      contextMenu.style.display = 'none';
+    });
+    
+    // Handle clicks on the frequency chart
     freqCtx.canvas.addEventListener('click', function(e) {
       var rect = freqCtx.canvas.getBoundingClientRect();
       var x = e.clientX - rect.left;
@@ -223,10 +284,10 @@
     
     // Handle drag operations
     var isDragging = false;
-    var lastX = 0;
-    var lastY = 0;
     
     freqCtx.canvas.addEventListener('mousedown', function(e) {
+      if (e.button !== 0) return; // Only respond to left clicks
+      
       var rect = freqCtx.canvas.getBoundingClientRect();
       var x = e.clientX - rect.left;
       var y = e.clientY - rect.top;
@@ -239,8 +300,6 @@
       }
       
       isDragging = true;
-      lastX = x;
-      lastY = y;
       
       // Set initial point
       updateFrequencyAtPoint(x, y);
@@ -255,9 +314,6 @@
       
       // Update frequency at current position
       updateFrequencyAtPoint(x, y);
-      
-      lastX = x;
-      lastY = y;
     });
     
     function updateFrequencyAtPoint(x, y) {
