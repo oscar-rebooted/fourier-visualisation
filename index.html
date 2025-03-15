@@ -1,11 +1,226 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Visualization</title>
+  <title>Fourier Transform Visualization</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background-color: #f7f9fc;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      background-color: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    h1, h2 {
+      text-align: center;
+      color: #333;
+    }
+    .chart-container {
+      position: relative;
+      height: 250px;
+      margin-bottom: 30px;
+    }
+    .instructions {
+      text-align: center;
+      margin: 10px 0 20px;
+      font-size: 14px;
+      color: #666;
+    }
+  </style>
 </head>
 <body>
-    <script src="fourier_visualisation.js"></script>
+  <div class="container">
+    <h1>Fourier Transform Visualization</h1>
+    
+    <h2>Time Domain</h2>
+    <div class="chart-container">
+      <canvas id="timeChart"></canvas>
+    </div>
+    
+    <h2>Frequency Domain</h2>
+    <div class="chart-container">
+      <canvas id="freqChart"></canvas>
+    </div>
+    <p class="instructions">Click and drag bars up/down in the frequency domain to adjust amplitudes</p>
+  </div>
+  
+  <script>
+    // Initialize data
+    var frequencies = [0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5, 5.5, 6, 6.5, 7, 7.5, 8, 8.5, 9, 9.5, 10];
+    var amplitudes = [];
+    
+    // Set default amplitudes
+    for (var i = 0; i < frequencies.length; i++) {
+      if (frequencies[i] === 1) {
+        amplitudes.push(1);
+      } else if (frequencies[i] === 3) {
+        amplitudes.push(0.33);
+      } else if (frequencies[i] === 5) {
+        amplitudes.push(0.2);
+      } else {
+        amplitudes.push(0);
+      }
+    }
+    
+    // Setup frequency domain chart
+    var freqCtx = document.getElementById('freqChart').getContext('2d');
+    var freqChart = new Chart(freqCtx, {
+      type: 'bar',
+      data: {
+        labels: frequencies,
+        datasets: [{
+          label: 'Amplitude',
+          data: amplitudes,
+          backgroundColor: 'rgba(75, 192, 192, 0.5)',
+          borderColor: 'rgba(75, 192, 192, 1)',
+          borderWidth: 1
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          y: {
+            beginAtZero: true,
+            max: 1.2,
+            title: {
+              display: true,
+              text: 'Amplitude'
+            }
+          },
+          x: {
+            title: {
+              display: true,
+              text: 'Frequency (Hz)'
+            }
+          }
+        }
+      }
+    });
+    
+    // Setup time domain chart
+    var timeCtx = document.getElementById('timeChart').getContext('2d');
+    var timeChart = new Chart(timeCtx, {
+      type: 'line',
+      data: {
+        datasets: [{
+          label: 'Waveform',
+          borderColor: 'rgba(153, 102, 255, 1)',
+          borderWidth: 2,
+          pointRadius: 0,
+          tension: 0.1
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          y: {
+            min: -3,
+            max: 3,
+            title: {
+              display: true,
+              text: 'Amplitude'
+            }
+          },
+          x: {
+            type: 'linear',
+            title: {
+              display: true,
+              text: 'Time'
+            },
+            ticks: {
+              callback: function(value) {
+                return value.toFixed(1);
+              }
+            }
+          }
+        }
+      }
+    });
+    
+    // Generate time domain data
+    function updateTimeData() {
+      var points = 200;
+      var timeData = [];
+      var labels = [];
+      
+      for (var i = 0; i < points; i++) {
+        var t = (i / points) * 4 * Math.PI;
+        var signal = 0;
+        
+        // Sum all frequency components
+        for (var j = 0; j < frequencies.length; j++) {
+          signal += amplitudes[j] * Math.sin(frequencies[j] * t);
+        }
+        
+        timeData.push(signal);
+        labels.push(t);
+      }
+      
+      timeChart.data.labels = labels;
+      timeChart.data.datasets[0].data = timeData;
+      timeChart.update();
+    }
+    
+    // Initial render
+    updateTimeData();
+    
+    // Track drag state
+    var isDragging = false;
+    var activeBarIndex = -1;
+    
+    // Mouse event handlers
+    freqCtx.canvas.addEventListener('mousedown', function(e) {
+      var element = freqChart.getElementsAtEventForMode(e, 'nearest', { intersect: true }, false);
+      if (element.length > 0) {
+        isDragging = true;
+        activeBarIndex = element[0].index;
+        updateAmplitude(e);
+      }
+    });
+    
+    freqCtx.canvas.addEventListener('mousemove', function(e) {
+      if (isDragging && activeBarIndex !== -1) {
+        updateAmplitude(e);
+      }
+    });
+    
+    function updateAmplitude(e) {
+      var rect = freqCtx.canvas.getBoundingClientRect();
+      var y = e.clientY - rect.top;
+      var chartArea = freqChart.chartArea;
+      
+      // Calculate amplitude based on y position
+      var newAmplitude = 1 - ((y - chartArea.top) / (chartArea.bottom - chartArea.top));
+      newAmplitude = Math.max(0, Math.min(1, newAmplitude)); // Clamp between 0 and 1
+      
+      // Update data
+      amplitudes[activeBarIndex] = newAmplitude;
+      freqChart.data.datasets[0].data = amplitudes;
+      freqChart.update();
+      
+      // Update time domain chart
+      updateTimeData();
+    }
+    
+    // Stop dragging when mouse up or leaves canvas
+    document.addEventListener('mouseup', function() {
+      isDragging = false;
+      activeBarIndex = -1;
+    });
+    
+    freqCtx.canvas.addEventListener('mouseleave', function() {
+      isDragging = false;
+      activeBarIndex = -1;
+    });
+  </script>
 </body>
 </html>
