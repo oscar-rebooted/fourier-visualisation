@@ -48,7 +48,7 @@
     <div class="chart-container">
       <canvas id="freqChart"></canvas>
     </div>
-    <p class="instructions">Click and drag bars up/down in the frequency domain to adjust amplitudes</p>
+    <p class="instructions">Click anywhere to set amplitude at that frequency</p>
   </div>
   
   <script>
@@ -76,7 +76,6 @@
       data: {
         labels: frequencies,
         datasets: [{
-          label: 'Amplitude',
           data: amplitudes,
           backgroundColor: 'rgba(75, 192, 192, 0.5)',
           borderColor: 'rgba(75, 192, 192, 1)',
@@ -86,6 +85,21 @@
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: false
+          },
+          tooltip: {
+            callbacks: {
+              title: function(context) {
+                return 'Frequency: ' + context[0].label + ' Hz';
+              },
+              label: function(context) {
+                return 'Amplitude: ' + context.raw.toFixed(2);
+              }
+            }
+          }
+        },
         scales: {
           y: {
             beginAtZero: true,
@@ -111,7 +125,6 @@
       type: 'line',
       data: {
         datasets: [{
-          label: 'Waveform',
           borderColor: 'rgba(153, 102, 255, 1)',
           borderWidth: 2,
           pointRadius: 0,
@@ -121,6 +134,11 @@
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: false
+          }
+        },
         scales: {
           y: {
             min: -3,
@@ -173,37 +191,94 @@
     // Initial render
     updateTimeData();
     
-    // Track drag state
-    var isDragging = false;
-    var activeBarIndex = -1;
-    
-    // Mouse event handlers
-    freqCtx.canvas.addEventListener('mousedown', function(e) {
-      var element = freqChart.getElementsAtEventForMode(e, 'nearest', { intersect: true }, false);
-      if (element.length > 0) {
-        isDragging = true;
-        activeBarIndex = element[0].index;
-        updateAmplitude(e);
-      }
-    });
-    
-    freqCtx.canvas.addEventListener('mousemove', function(e) {
-      if (isDragging && activeBarIndex !== -1) {
-        updateAmplitude(e);
-      }
-    });
-    
-    function updateAmplitude(e) {
+    // Handle clicks on the frequency chart to set amplitude directly
+    freqCtx.canvas.addEventListener('click', function(e) {
       var rect = freqCtx.canvas.getBoundingClientRect();
+      var x = e.clientX - rect.left;
       var y = e.clientY - rect.top;
       var chartArea = freqChart.chartArea;
       
-      // Calculate amplitude based on y position
-      var newAmplitude = 1 - ((y - chartArea.top) / (chartArea.bottom - chartArea.top));
-      newAmplitude = Math.max(0, Math.min(1, newAmplitude)); // Clamp between 0 and 1
+      // Ensure click is within chart area
+      if (x < chartArea.left || x > chartArea.right || 
+          y < chartArea.top || y > chartArea.bottom) {
+        return;
+      }
+      
+      // Calculate which frequency was clicked
+      var xRatio = (x - chartArea.left) / (chartArea.right - chartArea.left);
+      var freqIndex = Math.round(xRatio * (frequencies.length - 1));
+      
+      // Calculate amplitude based on click height
+      var amplitude = 1 - ((y - chartArea.top) / (chartArea.bottom - chartArea.top));
+      amplitude = Math.max(0, Math.min(1, amplitude)); // Clamp between 0 and 1
       
       // Update data
-      amplitudes[activeBarIndex] = newAmplitude;
+      amplitudes[freqIndex] = amplitude;
+      freqChart.data.datasets[0].data = amplitudes;
+      freqChart.update();
+      
+      // Update time domain chart
+      updateTimeData();
+    });
+    
+    // Handle drag operations
+    var isDragging = false;
+    var lastX = 0;
+    var lastY = 0;
+    
+    freqCtx.canvas.addEventListener('mousedown', function(e) {
+      var rect = freqCtx.canvas.getBoundingClientRect();
+      var x = e.clientX - rect.left;
+      var y = e.clientY - rect.top;
+      var chartArea = freqChart.chartArea;
+      
+      // Ensure click is within chart area
+      if (x < chartArea.left || x > chartArea.right || 
+          y < chartArea.top || y > chartArea.bottom) {
+        return;
+      }
+      
+      isDragging = true;
+      lastX = x;
+      lastY = y;
+      
+      // Set initial point
+      updateFrequencyAtPoint(x, y);
+    });
+    
+    freqCtx.canvas.addEventListener('mousemove', function(e) {
+      if (!isDragging) return;
+      
+      var rect = freqCtx.canvas.getBoundingClientRect();
+      var x = e.clientX - rect.left;
+      var y = e.clientY - rect.top;
+      
+      // Update frequency at current position
+      updateFrequencyAtPoint(x, y);
+      
+      lastX = x;
+      lastY = y;
+    });
+    
+    function updateFrequencyAtPoint(x, y) {
+      var chartArea = freqChart.chartArea;
+      
+      // Ensure point is within chart area
+      if (x < chartArea.left || x > chartArea.right || 
+          y < chartArea.top || y > chartArea.bottom) {
+        return;
+      }
+      
+      // Calculate which frequency corresponds to this x position
+      var xRatio = (x - chartArea.left) / (chartArea.right - chartArea.left);
+      var freqIndex = Math.round(xRatio * (frequencies.length - 1));
+      
+      // Calculate amplitude based on y position
+      var amplitude = 1 - ((y - chartArea.top) / (chartArea.bottom - chartArea.top));
+      amplitude = Math.max(0, Math.min(1, amplitude)); // Clamp between 0 and 1
+      
+      // Update data
+      amplitudes[freqIndex] = amplitude;
       freqChart.data.datasets[0].data = amplitudes;
       freqChart.update();
       
@@ -211,15 +286,12 @@
       updateTimeData();
     }
     
-    // Stop dragging when mouse up or leaves canvas
     document.addEventListener('mouseup', function() {
       isDragging = false;
-      activeBarIndex = -1;
     });
     
     freqCtx.canvas.addEventListener('mouseleave', function() {
       isDragging = false;
-      activeBarIndex = -1;
     });
   </script>
 </body>
