@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import Visualisation from './Visualisation.tsx'
 
 function App() {

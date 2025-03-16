@@ -373,33 +373,7 @@ const Visualisation = () => {
         >
           Delete frequency component
         </div>
-      </div>
-      
-      <style jsx>{`
-        .container {
-          max-width: 900px;
-          margin: 0 auto;
-          padding: 20px;
-        }
-        .chart-container {
-          position: relative;
-          height: 300px;
-          margin-bottom: 30px;
-        }
-        .interactive-chart canvas {
-          cursor: pointer;
-        }
-        .instructions-panel {
-          background-color: #f8f9fa;
-          border-left: 4px solid #6c757d;
-          padding: 10px 15px;
-          margin-bottom: 20px;
-        }
-        .instructions {
-          margin: 0;
-          line-height: 1.5;
-        }
-      `}</style>
+      </div>      
     </div>
   );
 };
